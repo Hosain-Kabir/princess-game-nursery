@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- iPhone/Android: fit the screen, no zoom on tap -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#ffd6f5" />
+  <title>Princess &amp; Unicorn English</title>
+
+  <!-- Baloo 2 for the big kid-friendly English text,
+       Noto Sans Bengali for the Bangla meanings.
+       Falls back to system fonts when offline. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Noto+Sans+Bengali:wght@500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="app">
+
+    <!-- ============ TOP BAR (always visible) ============ -->
+    <header id="topbar">
+      <button id="home-btn" class="icon-btn" aria-label="Home">🏠 <span class="btn-text">Home</span></button>
+      <div id="star-pill" aria-label="Stars earned">⭐ <span id="star-total">0</span></div>
+      <button id="mute-btn" class="icon-btn" aria-label="Sound on or off">🔊</button>
+    </header>
+
+    <!-- ============ HOME SCREEN ============ -->
+    <main id="screen-home" class="screen active">
+      <div class="home-inner">
+        <h1 class="game-title">👑 Princess<br>&amp; 🦄 Unicorn<br><span class="title-english">English</span></h1>
+        <div class="home-characters" aria-hidden="true">
+          <span class="char float-anim" style="animation-delay:0s">👸</span>
+          <span class="char float-anim" style="animation-delay:.4s">🦄</span>
+          <span class="char float-anim" style="animation-delay:.8s">🐦</span>
+          <span class="char float-anim" style="animation-delay:1.2s">🐱</span>
+        </div>
+        <!-- The 10 level buttons are built by game.js from the `levels` list -->
+        <div id="level-grid" class="level-grid"></div>
+        <p class="home-tip">Tap a game to play! 🔊</p>
+      </div>
+    </main>
+
+    <!-- ============ GAME SCREEN (one host for all levels) ============ -->
+    <main id="screen-game" class="screen">
+      <div class="level-header">
+        <div id="level-title" class="level-title">Level</div>
+        <div id="progress-dots" class="progress-dots" aria-hidden="true"></div>
+      </div>
+      <!-- Each level renders its play area inside here -->
+      <div id="play-area" class="play-area"></div>
+      <!-- Gentle feedback line: "Great job!" / "Try again!" -->
+      <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+    </main>
+
+    <!-- ============ CELEBRATION SCREEN ============ -->
+    <main id="screen-celebrate" class="screen">
+      <div class="celebrate-inner">
+        <div class="celebrate-characters" aria-hidden="true">
+          <span class="char dance-anim" style="animation-delay:0s">👸</span>
+          <span class="char dance-anim" style="animation-delay:.2s">🦄</span>
+          <span class="char dance-anim" style="animation-delay:.4s">🐦</span>
+          <span class="char dance-anim" style="animation-delay:.6s">🐱</span>
+        </div>
+        <h2 class="celebrate-title">Great job! 🎉</h2>
+        <p id="celebrate-detail" class="celebrate-detail">You earned 5 stars!</p>
+        <div id="celebrate-stars" class="celebrate-stars" aria-hidden="true">⭐⭐⭐⭐⭐</div>
+        <div class="celebrate-buttons">
+          <button id="play-again-btn" class="big-btn btn-pink">🔁 Play again</button>
+          <button id="celebrate-home-btn" class="big-btn btn-blue">🏠 Home</button>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Confetti & sparkles are spawned into this fixed overlay -->
+  <div id="fx-layer" aria-hidden="true"></div>
+
+  <script>
+/* ==== inline: game.js ==== */
+/* ============================================================================
+   PRINCESS & UNICORN ENGLISH — game.js
+   A nursery (age 3-5) English game. Plain HTML + CSS + vanilla JavaScript.
+   Open index.html in any browser — no build step, no backend.
+
+   HOW TO EXTEND:
+   All learning content lives in the `data` object just below. Add or change
+   words/sentences there — no other code needs to change.
+   ========================================================================== */
+
+'use strict';
+
+/* ============================================================================
+   1) ALL GAME DATA  (edit this to add more words / sentences / levels)
+   ========================================================================== */
+const data = {
+
+  // Level 1 — Letter Friends.
+  // Each letter has TWO words that start with it. One is chosen as the picture
+  // cue, the child taps the word that matches.
+  letterFriends: [
+    { letter: 'A', words: [ ['Apple', '🍎'], ['Ant', '🐜'] ] },
+    { letter: 'C', words: [ ['Cock', '🐓'],  ['Cow', '🐄'] ] },
+    { letter: 'E', words: [ ['Eye', '👁️'],   ['Ear', '👂'] ] },
+    { letter: 'G', words: [ ['Gate', '🚪'],  ['Girl', '👧'] ] },
+    { letter: 'I', words: [ ['Iron', '🧺'],  ['Ice', '🧊'] ] },
+    { letter: 'K', words: [ ['Kite', '🪁'],  ['Key', '🔑'] ] },
+    { letter: 'L', words: [ ['Lion', '🦁'],  ['Leg', '🦵'] ] },
+    { letter: 'M', words: [ ['Milk', '🥛'],  ['Moon', '🌙'] ] },
+    { letter: 'O', words: [ ['Old', '👴'],   ['Oil', '🛢️'] ] },
+    { letter: 'Q', words: [ ['Quill', '🪶'], ['Quilt', '🛏️'] ] },
+    { letter: 'S', words: [ ['Soap', '🧼'],  ['Son', '👦'] ] },
+    { letter: 'T', words: [ ['Tree', '🌳'],  ['Tooth', '🦷'] ] },
+    { letter: 'V', words: [ ['Van', '🚐'],   ['Violin', '🎻'] ] },
+    { letter: 'X', words: [ ['Xylo', '🎵'],  ['X-ray', '🩻'] ] },
+    { letter: 'Y', words: [ ['Yen', '💴'],   ['Yard', '🏡'] ] },
+  ],
+
+  // Level 2 — Find the Word (picture match, 3 choices).
+  findWord: [
+    ['Apple', '🍎'], ['Cock', '🐓'], ['Xylo', '🎵'],  ['Gate', '🚪'],
+    ['Quill', '🪶'], ['Tooth', '🦷'], ['Soap', '🧼'], ['Violin', '🎻'],
+    ['Moon', '🌙'],  ['Yen', '💴'],   ['Kite', '🪁'], ['Oil', '🛢️'],
+    ['Eye', '👁️'],   ['Iron', '🧺'],  ['Lion', '🦁'], ['Tree', '🌳'],
+    ['Yard', '🏡'],  ['Key', '🔑'],
+  ],
+
+  // Level 3 — Jumbled Words (tap the letter tiles in the right order).
+  jumbledWords: ['Key', 'Cock', 'Iron', 'Xylo', 'Yard', 'Quill', 'Soap', 'Tree', 'Moon', 'Lion'],
+
+  // Level 4 — Vowel Time (the Bird collects vowels).
+  vowels: ['a', 'e', 'i', 'o', 'u'],
+  consonants: ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'],
+  vowelTarget: 8,          // how many vowels the Bird must collect to finish
+
+  // Level 5 — Rhyme Match (tap the two rhyming words).
+  rhymePairs: [
+    ['Ball', 'Tall'], ['Dot', 'Pot'], ['Box', 'Fox'], ['Cut', 'Nut'], ['Fan', 'Van'],
+    ['Pen', 'Ten'],   ['Run', 'Bun'], ['Hit', 'Pit'], ['Bug', 'Jug'],
+  ],
+
+  // Level 6 — Opposites (tap the two opposite words).
+  oppositePairs: [
+    ['Small', 'Big'], ['Night', 'Day'], ['Off', 'On'],
+    ['Stop', 'Go'],   ['Girl', 'Boy'],  ['Short', 'Tall'],
+  ],
+
+  // Level 7 — Read with the Princess (sentences read aloud with highlight).
+  sentences: [
+    'This is a rat.',
+    'That is a pot.',
+    'This is my cat.',
+    'This is my toy.',
+    'He is a boy.',
+    'She is a girl.',
+    'It is a fan.',
+    'It is a dog.',
+  ],
+
+  // Level 8 — Vegetables & Fish flashcards (English + Bangla), then a quiz.
+  vegetables: [
+    { en: 'Cauliflower', bn: 'ফুলকপি',  emoji: '🥦' },
+    { en: 'Potato',      bn: 'আলু',     emoji: '🥔' },
+    { en: 'Cabbage',     bn: 'বাঁধাকপি', emoji: '🥬' },
+    { en: 'Carrot',      bn: 'গাজর',    emoji: '🥕' },
+    { en: 'Brinjal',     bn: 'বেগুন',   emoji: '🍆' },
+    { en: 'Turnip',      bn: 'শালগম',   emoji: '🧅' },
+    { en: 'Cucumber',    bn: 'শসা',     emoji: '🥒' },
+    { en: 'Tomato',      bn: 'টমেটো',   emoji: '🍅' },
+  ],
+  fish: [
+    { en: 'Hilsa Fish',  bn: 'ইলিশ মাছ',    emoji: '🐟' },
+    { en: 'Pomfret',     bn: 'রূপচাঁদা',     emoji: '🐠' },
+    { en: 'Salmon',      bn: 'রুই',         emoji: '🐟' },
+    { en: 'Catla',       bn: 'কাতলা',       emoji: '🐡' },
+    { en: 'Butter fish', bn: 'পাবদা মাছ',    emoji: '🐠' },
+    { en: 'Shrimp',      bn: 'বাগদা চিংড়ি', emoji: '🦐' },
+    { en: 'Cat fish',    bn: 'মাগুর মাছ',    emoji: '🐟' },
+    { en: 'Boal',        bn: 'বোয়াল',      emoji: '🐡' },
+  ],
+
+  // Level 9 — Months Song (tap the months in order).
+  months: ['January', 'February', 'March', 'April', 'May', 'June',
+           'July', 'August', 'September', 'October', 'November', 'December'],
+
+  // Level 10 — Spelling (hear the word, build it) then Dictation (hear the phrase).
+  spellWords: ['Soap', 'Xylo', 'Tree', 'Cock', 'Oil', 'Moon', 'Yard',
+               'Iron', 'Kite', 'Gate', 'Lion', 'Quilt', 'Apple', 'Eye', 'Yen'],
+  dictation:  ['A soap.', 'An iron.', 'An eye.', 'A lion.',
+               'A kite.', 'A gate.', 'A quill.', 'An X-ray.'],
+
+  // One word → emoji lookup used by spelling tiles, jumbled words, etc.
+  emojiFor: {
+    apple: '🍎', ant: '🐜', cock: '🐓', cow: '🐄', eye: '👁️', ear: '👂',
+    gate: '🚪', girl: '👧', iron: '🧺', ice: '🧊', kite: '🪁', key: '🔑',
+    lion: '🦁', leg: '🦵', milk: '🥛', moon: '🌙', old: '👴', oil: '🛢️',
+    quill: '🪶', quilt: '🛏️', soap: '🧼', son: '👦', tree: '🌳', tooth: '🦷',
+    van: '🚐', violin: '🎻', xylo: '🎵', 'x-ray': '🩻', yen: '💴', yard: '🏡',
+  },
+};
+
+// Build the jumbled list from the plain word list, adding letters + emoji.
+data.jumbled = data.jumbledWords.map(word => ({
+  word: word,
+  letters: word.toLowerCase().split(''),
+  emoji: data.emojiFor[word.toLowerCase()] || '✨',
+}));
+
+// Helper: best-effort emoji for any English word.
+function emojiForWord(word) {
+  return data.emojiFor[String(word).toLowerCase()] || '✨';
+}
+
+/* ============================================================================
+   2) THE LEVEL MENU (home screen buttons)
+   ========================================================================== */
+const LEVELS = [
+  { id: 'letterFriends',   icon: '🔤', name: 'Letter Friends',   cssClass: 'lvl-1'  },
+  { id: 'findWord',        icon: '🍎', name: 'Find the Word',    cssClass: 'lvl-2'  },
+  { id: 'jumbled',         icon: '🧩', name: 'Jumbled Words',    cssClass: 'lvl-3'  },
+  { id: 'vowelTime',       icon: '🐦', name: 'Vowel Time',       cssClass: 'lvl-4'  },
+  { id: 'rhyme',           icon: '🎵', name: 'Rhyme Match',      cssClass: 'lvl-5'  },
+  { id: 'opposites',       icon: '🔁', name: 'Opposites',        cssClass: 'lvl-6'  },
+  { id: 'reading',         icon: '📖', name: 'Read with Princess', cssClass: 'lvl-7' },
+  { id: 'veggiesFish',     icon: '🥕', name: 'Veggies & Fish',   cssClass: 'lvl-8'  },
+  { id: 'months',          icon: '🌈', name: 'Months Song',      cssClass: 'lvl-9'  },
+  { id: 'spelling',        icon: '✏️', name: 'Spelling Time',    cssClass: 'lvl-10' },
+];
+
+/* ============================================================================
+   3) APP STATE + localStorage
+   ========================================================================== */
+const STORAGE_STARS = 'princessUnicorn.totalStars';
+const STORAGE_MUTE  = 'princessUnicorn.muted';
+
+let totalStars   = 0;        // all-time stars, saved on this device
+let sessionStars = 0;        // stars earned in the current level run
+let currentLevel = null;     // LEVELS entry being played
+let muted        = false;    // sound switch
+let activeCleanup = null;    // level registers teardown here (timers, intervals)
+
+/* ============================================================================
+   4) TINY HELPERS
+   ========================================================================== */
+function $(sel, root) { return (root || document).querySelector(sel); }
+function $all(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+
+/** In-place Fisher–Yates shuffle (returns a new array). */
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Pick n random items from arr. */
+function pickRandom(arr, n) { return shuffle(arr).slice(0, n); }
+
+/** Every letter of a word uppercased, stripped of anything not A–Z. */
+function lettersOnly(word) { return String(word).toUpperCase().replace(/[^A-Z]/g, '').split(''); }
+
+/* ============================================================================
+   5) SOUND — SpeechSynthesis (reading aloud) + Web Audio (beeps)
+   ========================================================================== */
+const speech = window.speechSynthesis || null;
+
+/** Read text aloud in a slow, high, friendly voice. Safe to call anytime. */
+function speak(text, opts) {
+  if (!speech || muted || !text) return;
+  const options = opts || {};
+  try {
+    speech.cancel(); // never talk over ourselves
+    const utterance = new SpeechSynthesisUtterance(String(text));
+    utterance.lang  = options.lang  || 'en-US';
+    utterance.rate  = options.rate  || 0.78;  // slow for little ears
+    utterance.pitch = options.pitch || 1.4;   // high & cheerful
+    utterance.volume = 1;
+    if (options.onboundary) utterance.onboundary = options.onboundary;
+    if (options.onend)      utterance.onend      = options.onend;
+    if (options.onstart)    utterance.onstart    = options.onstart;
+    speech.speak(utterance);
+    return utterance;
+  } catch (err) {
+    console.warn('Speech not available:', err);
+    return null;
+  }
+}
+
+function stopSpeaking() { if (speech) speech.cancel(); }
+
+/* --- Web Audio beeps -------------------------------------------------- */
+let audioCtx = null;
+function getAudioContext() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (err) { console.warn('Web Audio not available:', err); }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+/** One soft musical note. */
+function playNote(freq, delaySeconds, durationSeconds, type, volume) {
+  const ctx = getAudioContext();
+  if (!ctx || muted) return;
+  const t0 = ctx.currentTime + (delaySeconds || 0);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(volume || 0.35, t0 + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + (durationSeconds || 0.35));
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + (durationSeconds || 0.35) + 0.02);
+}
+
+const SoundFX = {
+  /** Happy ascending arpeggio for a correct answer. */
+  correct() { playNote(659.25, 0, 0.18, 'triangle', 0.4); playNote(783.99, 0.12, 0.18, 'triangle', 0.4); playNote(1046.5, 0.24, 0.4, 'triangle', 0.45); },
+  /** Gentle low "boop" — never scary — for a wrong tap. */
+  wrong()   { playNote(220, 0, 0.22, 'sine', 0.22); },
+  /** Tiny pop for tile taps and selections. */
+  pop()     { playNote(880, 0, 0.08, 'square', 0.12); },
+  /** Sparkle chime for a matched pair. */
+  match()   { playNote(1318.5, 0, 0.15, 'triangle', 0.35); playNote(1567.98, 0.1, 0.3, 'triangle', 0.35); },
+  /** Big fanfare for the celebration screen. */
+  fanfare() { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => playNote(f, i * 0.16, 0.3, 'triangle', 0.4)); },
+};
+
+/* ============================================================================
+   6) STARS + FEEDBACK + CONFETTI
+   ========================================================================== */
+function loadSavedState() {
+  try {
+    totalStars = parseInt(localStorage.getItem(STORAGE_STARS) || '0', 10) || 0;
+    muted = localStorage.getItem(STORAGE_MUTE) === '1';
+  } catch (err) {
+    totalStars = 0; muted = false; // private mode etc. — just play without saving
+  }
+}
+function saveStars() { try { localStorage.setItem(STORAGE_STARS, String(totalStars)); } catch (e) { /* ignore */ } }
+function saveMute()  { try { localStorage.setItem(STORAGE_MUTE, muted ? '1' : '0'); } catch (e) { /* ignore */ } }
+
+function updateStarDisplay() { $('#star-total').textContent = String(totalStars); }
+
+function addStars(n) {
+  totalStars += n;
+  sessionStars += n;
+  saveStars();
+  updateStarDisplay();
+  const pill = $('#star-pill'); // little pop so the child notices
+  pill.classList.remove('pop'); void pill.offsetWidth; pill.classList.add('pop');
+}
+
+/** Show a friendly line under the play area. kind: 'good' | 'oops' | '' */
+function setFeedback(text, kind) {
+  const box = $('#feedback');
+  box.textContent = text || '';
+  box.className = 'feedback' + (kind ? ' ' + kind : '');
+}
+
+/** Give every .helper-char in the play area a happy jump. */
+function cheerHelpers() {
+  $all('.helper-char', $('#play-area')).forEach(el => {
+    el.classList.remove('cheer-jump'); void el.offsetWidth; el.classList.add('cheer-jump');
+  });
+}
+
+/** Gentle shake on an element (for a "try again" moment). */
+function shakeElement(el) {
+  if (!el) return;
+  el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+}
+
+/** Sprinkle stars / confetti emoji from the top of the screen. */
+function burstConfetti(count) {
+  const layer = $('#fx-layer');
+  const pieces = ['⭐', '🌟', '✨', '🎉', '💖', '🎊', '🦄', '👸'];
+  const total = count || 40;
+  for (let i = 0; i < total; i++) {
+    const piece = document.createElement('span');
+    piece.className = 'fx-piece';
+    piece.textContent = pieces[Math.floor(Math.random() * pieces.length)];
+    piece.style.left = (Math.random() * 100) + 'vw';
+    piece.style.fontSize = (1 + Math.random() * 1.4) + 'rem';
+    piece.style.animationDuration = (1.6 + Math.random() * 1.6) + 's';
+    piece.style.animationDelay = (Math.random() * 0.6) + 's';
+    layer.appendChild(piece);
+    setTimeout(() => piece.remove(), 4200);
+  }
+}
+
+/* ============================================================================
+   7) SCREEN MANAGEMENT
+   ========================================================================== */
+const screens = { home: '#screen-home', game: '#screen-game', celebrate: '#screen-celebrate' };
+
+function showScreen(name) {
+  Object.keys(screens).forEach(key => $(screens[key]).classList.toggle('active', key === name));
+}
+
+/** Tear down whatever the current level set up (timers, intervals, speech). */
+function leaveLevel() {
+  stopSpeaking();
+  if (typeof activeCleanup === 'function') { try { activeCleanup(); } catch (e) { /* ignore */ } }
+  activeCleanup = null;
+  setFeedback('');
+}
+
+function goHome() { leaveLevel(); showScreen('home'); }
+
+/** Show celebration after a level is finished. */
+function showCelebration() {
+  leaveLevel();
+  $('#celebrate-detail').textContent =
+    'You earned ' + sessionStars + (sessionStars === 1 ? ' star' : ' stars') + ' in this game!';
+  const shown = Math.max(1, Math.min(sessionStars, 10));
+  $('#celebrate-stars').textContent = '⭐'.repeat(shown);
+  showScreen('celebrate');
+  SoundFX.fanfare();
+  burstConfetti(60);
+}
+
+/** Called by every level when it is finished. */
+function levelComplete() {
+  burstConfetti(45);
+  setTimeout(showCelebration, 950);
+}
+
+function updateProgressDots(total, done) {
+  const wrap = $('#progress-dots');
+  wrap.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    const dot = document.createElement('span');
+    dot.className = 'dot' + (i < done ? ' done' : '');
+    wrap.appendChild(dot);
+  }
+}
+
+/** Prepare the game screen for a level. Returns the play-area element. */
+function beginLevel(level) {
+  currentLevel = level;
+  sessionStars = 0;
+  leaveLevel();                    // safety: clear anything from a previous level
+  $('#level-title').textContent = level.icon + ' ' + level.name;
+  $('#play-area').innerHTML = '';
+  $('#progress-dots').innerHTML = '';
+  showScreen('game');
+  return $('#play-area');
+}
+
+/* ============================================================================
+   8) SHARED QUESTION HELPERS
+   ========================================================================== */
+
+/** Build a standard choice button. */
+function makeChoiceButton(innerHTML, onTap, extraClass) {
+  const btn = document.createElement('button');
+  btn.className = 'choice-btn' + (extraClass ? ' ' + extraClass : '');
+  btn.innerHTML = innerHTML;
+  btn.addEventListener('click', onTap);
+  return btn;
+}
+
+/** Handle a correct answer: sound, star, confetti-lite, then advance. */
+function handleCorrect(button, after) {
+  if (button) button.classList.add('correct');
+  SoundFX.correct();
+  addStars(1);
+  setFeedback('Great job! 🌟', 'good');
+  cheerHelpers();
+  burstConfetti(14);
+  speak('Great job!');
+  setTimeout(after, 1150);
+}
+
+/** Handle a wrong answer: gentle shake + "Try again!" (unlimited tries). */
+function handleWrong(button) {
+  if (button) button.classList.add('wrong');
+  SoundFX.wrong();
+  setFeedback('Try again! 💪', 'oops');
+  shakeElement(button);
+  setTimeout(() => { if (button) button.classList.remove('wrong'); }, 700);
+}
+
+/** A 🔊 button the child taps to hear something again. */
+function makeSpeakButton(textToSpeak, label) {
+  const btn = document.createElement('button');
+  btn.className = 'speak-btn';
+  btn.setAttribute('aria-label', label || 'Hear it again');
+  btn.textContent = '🔊';
+  btn.addEventListener('click', () => { SoundFX.pop(); speak(textToSpeak()); });
+  return btn;
+}
+
+/* ============================================================================
+   9) LEVEL 1 — LETTER FRIENDS
+      Show a big letter + a picture; tap the matching word.
+   ========================================================================== */
+function startLetterFriends() {
+  const level = LEVELS.find(l => l.id === 'letterFriends');
+  const area = beginLevel(level);
+  const QUESTIONS = 7;
+  const rounds = pickRandom(data.letterFriends, QUESTIONS);
+  let index = 0;
+
+  function showQuestion() {
+    area.innerHTML = '';
+    setFeedback('');
+    updateProgressDots(QUESTIONS, index);
+
+    const entry = rounds[index];
+    const [correctWord, correctEmoji] = entry.words[Math.floor(Math.random() * entry.words.length)];
+
+    // 3 distractors taken from other letters so they never start with `entry.letter`
+    const otherWords = data.letterFriends
+      .filter(item => item.letter !== entry.letter)
+      .flatMap(item => item.words);
+    const distractors = pickRandom(otherWords, 3);
+    const choices = shuffle([[correctWord, correctEmoji], ...distractors]);
+
+    // Layout: big letter, picture to guess, speaker
+    const topRow = document.createElement('div');
+    topRow.className = 'prompt-row';
+    topRow.innerHTML =
+      '<div class="big-letter">' + entry.letter + '</div>' +
+      '<div class="big-word-emoji" role="img" aria-label="' + correctWord + '">' + correctEmoji + '</div>' +
+      '<span class="helper-char">👸</span>';
+    area.appendChild(topRow);
+
+    const questionRow = document.createElement('div');
+    questionRow.className = 'prompt-row';
+    const qText = document.createElement('div');
+    qText.className = 'prompt-text';
+    qText.textContent = 'Which word starts with "' + entry.letter + '"?';
+    questionRow.appendChild(qText);
+    questionRow.appendChild(makeSpeakButton(() => 'Which word starts with ' + entry.letter + '?', 'Hear the question'));
+    area.appendChild(questionRow);
+
+    const grid = document.createElement('div');
+    grid.className = 'choice-grid';
+    choices.forEach(([word, emoji]) => {
+      const btn = makeChoiceButton(
+        '<span class="choice-emoji">' + emoji + '</span><span>' + word + '</span>',
+        () => {
+          if (word === correctWord) {
+            speak(correctWord);
+            handleCorrect(btn, next);
+          } else {
+            handleWrong(btn);
+          }
+        }
+      );
+      grid.appendChild(btn);
+    });
+    area.appendChild(grid);
+
+    speak('Which word starts with ' + entry.letter + '?');
+  }
+
+  function next() {
+    index += 1;
+    if (index >= QUESTIONS) { updateProgressDots(QUESTIONS, QUESTIONS); levelComplete(); }
+    else showQuestion();
+  }
+
+  showQuestion();
+}
+
+/* ============================================================================
+   10) LEVEL 2 — FIND THE WORD (picture match, 3 word choices)
+   ========================================================================== */
+function startFindWord() {
+  const level = LEVELS.find(l => l.id === 'findWord');
+  const area = beginLevel(level);
+  const QUESTIONS = 8;
+  const rounds = pickRandom(data.findWord, QUESTIONS);
+  let index = 0;
+
+  function showQuestion() {
+    area.innerHTML = '';
+    setFeedback('');
+    updateProgressDots(QUESTIONS, index);
+
+    const [correctWord, correctEmoji] = rounds[index];
+    const distractors = pickRandom(data.findWord.filter(([w]) => w !== correctWord), 2);
+    const choices = shuffle([correctWord, ...distractors.map(([w]) => w)]);
+
+    const pic = document.createElement('div');
+    pic.className = 'big-word-emoji';
+    pic.setAttribute('role', 'img');
+    pic.setAttribute('aria-label', 'mystery picture');
+    pic.textContent = correctEmoji;
+    area.appendChild(pic);
+
+    const questionRow = document.createElement('div');
+    questionRow.className = 'prompt-row';
+    const qText = document.createElement('div');
+    qText.className = 'prompt-text';
+    qText.textContent = 'What is this? 🤔';
+    questionRow.appendChild(qText);
+    questionRow.appendChild(makeSpeakButton(() => 'What is this?', 'Hear the question'));
+    questionRow.appendChild(Object.assign(document.createElement('span'), { className: 'helper-char', textContent: '🦄' }));
+    area.appendChild(questionRow);
+
+    const grid = document.createElement('div');
+    grid.className = 'choice-grid cols-3';
+    choices.forEach(word => {
+      const btn = makeChoiceButton('<span>' + word + '</span>', () => {
+        if (word === correctWord) {
+          speak(correctWord);
+          handleCorrect(btn, next);
+        } else {
+          handleWrong(btn);
+        }
+      });
+      grid.appendChild(btn);
+    });
+    area.appendChild(grid);
+
+    speak('What is this?');
+  }
+
+  function next() {
+    index += 1;
+    if (index >= QUESTIONS) { updateProgressDots(QUESTIONS, QUESTIONS); levelComplete(); }
+    else showQuestion();
+  }
+
+  showQuestion();
+}
+
+/* ============================================================================
+   SHARED WORD-BUILDER (used by Level 3 Jumbled Words and Level 10 Spelling)
+   Tap tiles to place them in order; tap a placed tile to take it back.
+   ========================================================================== */
+function createWordBuilder(container, options) {
+  // options: { target: ['S','O','A','P'], onComplete: function(didWeWin){} }
+  const target = options.target;
+  const placed = new Array(target.length).fill(null);
+
+  const answerRow = document.createElement('div');
+  answerRow.className = 'answer-row';
+  answerRow.setAttribute('aria-label', 'Your answer');
+
+  const tray = document.createElement('div');
+  tray.className = 'tile-tray';
+
+  // Shuffled tray letters — re-shuffle if they accidentally come out in order
+  let trayLetters = shuffle(target);
+  if (target.length > 1 && trayLetters.join('') === target.join('')) {
+    trayLetters = trayLetters.slice(1).concat(trayLetters[0]);
+  }
+
+  function renderAnswerRow() {
+    answerRow.innerHTML = '';
+    placed.forEach((ch, slotIndex) => {
+      const slot = document.createElement('button');
+      slot.className = 'tile in-answer';
+      slot.textContent = ch || '';
+      slot.setAttribute('aria-label', ch ? 'Remove letter ' + ch : 'Empty slot');
+      if (!ch) { slot.style.visibility = 'hidden'; }
+      slot.addEventListener('click', () => {
+        if (!placed[slotIndex]) return;
+        SoundFX.pop();
+        const letter = placed[slotIndex];
+        placed[slotIndex] = null;
+        // free the matching used tray tile for this letter
+        const usedTiles = Array.from(tray.querySelectorAll('.tile.used'));
+        const match = usedTiles.find(t => t.textContent === letter);
+        if (match) match.classList.remove('used');
+        renderAnswerRow();
+      });
+      answerRow.appendChild(slot);
+    });
+  }
+
+  function checkComplete() {
+    if (placed.some(ch => !ch)) return; // not full yet
+    const attempt = placed.join('');
+    if (attempt === target.join('')) {
+      options.onComplete(true, answerRow);
+    } else {
+      options.onComplete(false, answerRow);
+      // clear back to tray after the shake
+      setTimeout(() => {
+        for (let i = 0; i < placed.length; i++) placed[i] = null;
+        $all('.tile', tray).forEach(t => t.classList.remove('used'));
+        renderAnswerRow();
+      }, 750);
+    }
+  }
+
+  trayLetters.forEach(letter => {
+    const tile = document.createElement('button');
+    tile.className = 'tile';
+    tile.textContent = letter;
+    tile.addEventListener('click', () => {
+      const emptyIndex = placed.indexOf(null);
+      if (emptyIndex === -1) return; // row is full
+      SoundFX.pop();
+      placed[emptyIndex] = letter;
+      tile.classList.add('used');
+      renderAnswerRow();
+      checkComplete();
+    });
+    tray.appendChild(tile);
+  });
+
+  renderAnswerRow();
+  container.appendChild(answerRow);
+  container.appendChild(tray);
+
+  return { answerRow, tray };
+}
+
+/* ============================================================================
+   11) LEVEL 3 — JUMBLED WORDS
+   ========================================================================== */
+function startJumbled() {
+  const level = LEVELS.find(l => l.id === 'jumbled');
+  const area = beginLevel(level);
+  const QUESTIONS = 6;
+  const rounds = pickRandom(data.jumbled, QUESTIONS);
+  let index = 0;
+
+  function showQuestion() {
+    area.innerHTML = '';
+    setFeedback('');
+    updateProgressDots(QUESTIONS, index);
+
+    const item = rounds[index];
+
+    const pic = document.createElement('div');
+    pic.className = 'big-word-emoji';
+    pic.textContent = item.emoji;
+    area.appendChild(pic);
+
+    const questionRow = document.createElement('div');
+    questionRow.className = 'prompt-row';
+    const qText = document.createElement('div');
+    qText.className = 'prompt-text';
+    qText.textContent = 'Spell the word! 🧩';
+    questionRow.appendChild(qText);
+    questionRow.appendChild(makeSpeakButton(() => item.word, 'Hear the word'));
+    questionRow.appendChild(Object.assign(document.createElement('span'), { className: 'helper-char', textContent: '🐱' }));
+    area.appendChild(questionRow);
+
+    const builderHost = document.createElement('div');
+    builderHost.style.width = '100%';
+    builderHost.style.display = 'flex';
+    builderHost.style.flexDirection = 'column';
+    builderHost.style.alignItems = 'center';
+    builderHost.style.gap = '10px';
+    area.appendChild(builderHost);
+
+    createWordBuilder(builderHost, {
+      target: item.letters.map(c => c.toUpperCase()),
+      onComplete: (won, answerRow) => {
+        if (won) {
+          speak(item.word);
+          handleCorrect(null, next);
+        } else {
+          SoundFX.wrong();
+          setFeedback('Try again! 💪', 'oops');
+          shakeElement(answerRow);
+          $all('.tile', answerRow).forEach(t => t.classList.add('wrong-shake'));
+        }
+      },
+    });
+
+    speak(item.word);
+  }
+
+  function next() {
+    index += 1;
+    if (index >= QUESTIONS) { updateProgressDots(QUESTIONS, QUESTIONS); levelComplete(); }
+    else showQuestion();
+  }
+
+  showQuestion();
+}
+
+/* ============================================================================
+   12) LEVEL 4 — VOWEL TIME  (the Bird collects the vowels falling from the sky)
+   ========================================================================== */
+function startVowelTime() {
+  const level = LEVELS.find(l => l.id === 'vowelTime');
+  const area = beginLevel(level);
+  updateProgressDots(data.vowelTarget, 0);
+
+  area.innerHTML =
+    '<div class="vowel-sky" id="vowel-sky">' +
+      '<div class="vowel-hud"><span>🐦 Vowels: <b id="vowel-collected">0</b> / ' + data.vowelTarget + '</span></div>' +
+      '<button class="speak-btn" id="vowel-speak" style="position:absolute;top:44px;right:10px;z-index:6;width:52px;height:52px;font-size:1.2rem;" aria-label="Hear the vowels">🔊</button>' +
+      '<div class="nest-area"><span id="nest-bird" class="helper-char">🐦</span><br>🪺</div>' +
+    '</div>';
+
+  const sky = $('#vowel-sky', area);
+  $('#vowel-speak', area).addEventListener('click', () => {
+    SoundFX.pop();
+    speak('A, E, I, O, U! Tap the vowels falling from the sky!');
+  });
+
+  let collected = 0;
+  let spawnTimer = null;
+  const fallDurationMs = 5200;
+
+  function spawnLetter() {
+    if (!sky.isConnected) return;
+    const isVowel = Math.random() < 0.45;
+    const letter = isVowel
+      ? data.vowels[Math.floor(Math.random() * data.vowels.length)]
+      : data.consonants[Math.floor(Math.random() * data.consonants.length)];
+
+    const tile = document.createElement('button');
+    tile.className = 'falling-letter ' + (isVowel ? 'vowel' : 'other');
+    tile.textContent = letter;
+    tile.style.left = (4 + Math.random() * 78) + '%';
+    tile.style.animationDuration = fallDurationMs + 'ms';
+    tile.setAttribute('aria-label', 'Letter ' + letter);
+
+    tile.addEventListener('click', () => {
+      if (isVowel) {
+        collected += 1;
+        SoundFX.pop();
+        speak(letter.toUpperCase());
+        $('#vowel-collected', area).textContent = String(collected);
+        updateProgressDots(data.vowelTarget, collected);
+        // little sparkle where the vowel was tapped
+        const sparkle = document.createElement('span');
+        sparkle.className = 'sparkle-pop';
+        sparkle.textContent = '✨';
+        sparkle.style.left = tile.style.left;
+        sparkle.style.top = tile.getBoundingClientRect().top - sky.getBoundingClientRect().top + 'px';
+        sky.appendChild(sparkle);
+        setTimeout(() => sparkle.remove(), 850);
+        tile.remove();
+        // the Bird hops with joy
+        const bird = $('#nest-bird', area);
+        bird.classList.remove('cheer-jump'); void bird.offsetWidth; bird.classList.add('cheer-jump');
+
+        if (collected >= data.vowelTarget) {
+          clearInterval(spawnTimer);
+          addStars(data.vowelTarget); // one star per vowel collected
+          setFeedback('Great job! The Bird is full! 🐦🪺', 'good');
+          levelComplete();
+        } else {
+          setFeedback('Yummy vowel! 🐦', 'good');
+        }
+      } else {
+        SoundFX.wrong();
+        setFeedback('Try again! 💪 Find a, e, i, o, u!', 'oops');
+        shakeElement(tile);
+      }
+    });
+
+    tile.addEventListener('animationend', () => tile.remove());
+    sky.appendChild(tile);
+  }
+
+  spawnTimer = setInterval(spawnLetter, 800);
+  activeCleanup = () => { clearInterval(spawnTimer); };
+
+  setFeedback('Tap the FALLING VOWELS! a e i o u', '');
+  speak('A, E, I, O, U! Tap the vowels falling from the sky!');
+}
+
+/* ============================================================================
+   13) LEVELS 5 & 6 — MATCH PAIRS ENGINE (rhymes and opposites)
+   ========================================================================== */
+function startMatchPairs(levelId, pairs, pairCount, instruction, helperChar, doneMessage) {
+  const level = LEVELS.find(l => l.id === levelId);
+  const area = beginLevel(level);
+  const chosen = pickRandom(pairs, Math.min(pairCount, pairs.length));
+
+  // Build a flat, shuffled list of the words from the chosen pairs
+  const cards = shuffle(chosen.flatMap((pair, pairIndex) =>
+    pair.map(word => ({ word: word, pairIndex: pairIndex }))
+  ));
+
+  let firstPick = null;      // { card data, element }
+  let lockBoard = false;
+  let matchedPairs = 0;
+
+  updateProgressDots(chosen.length, 0);
+
+  const questionRow = document.createElement('div');
+  questionRow.className = 'prompt-row';
+  const qText = document.createElement('div');
+  qText.className = 'prompt-text';
+  qText.textContent = instruction;
+  questionRow.appendChild(qText);
+  questionRow.appendChild(makeSpeakButton(() => instruction.replace(/[^\w\s,!.?]/g, ''), 'Hear the instruction'));
+  questionRow.appendChild(Object.assign(document.createElement('span'), { className: 'helper-char', textContent: helperChar }));
+  area.appendChild(questionRow);
+
+  const grid = document.createElement('div');
+  grid.className = 'match-grid';
+  area.appendChild(grid);
+
+  cards.forEach(card => {
+    const btn = makeChoiceButton('<span>' + card.word + '</span>', () => {
+      if (lockBoard || btn.classList.contains('matched') || btn.classList.contains('selected')) return;
+      SoundFX.pop();
+      speak(card.word);
+      btn.classList.add('selected');
+
+      if (!firstPick) { firstPick = { card, btn }; return; }
+
+      const second = { card, btn };
+      if (firstPick.card.pairIndex === second.card.pairIndex) {
+        // ---- It is a match! ----
+        firstPick.btn.classList.remove('selected');
+        second.btn.classList.remove('selected');
+        firstPick.btn.classList.add('matched');
+        second.btn.classList.add('matched');
+        matchedPairs += 1;
+        addStars(1);
+        SoundFX.match();
+        setFeedback('Match! ' + firstPick.card.word + ' + ' + second.card.word + ' 🌟', 'good');
+        cheerHelpers();
+        burstConfetti(12);
+        updateProgressDots(chosen.length, matchedPairs);
+        firstPick = null;
+        if (matchedPairs >= chosen.length) {
+          setFeedback(doneMessage, 'good');
+          levelComplete();
+        }
+      } else {
+        // ---- Not a match: gentle shake, try again ----
+        lockBoard = true;
+        const a = firstPick.btn, b = second.btn;
+        setFeedback('Try again! 💪', 'oops');
+        SoundFX.wrong();
+        shakeElement(a); shakeElement(b);
+        setTimeout(() => {
+          a.classList.remove('selected'); b.classList.remove('selected');
+          lockBoard = false;
+        }, 750);
+        firstPick = null;
+      }
+    });
+    btn.classList.remove('choice-btn');
+    btn.classList.add('match-card');
+    grid.appendChild(btn);
+  });
+
+  speak(instruction.replace(/[^\w\s,!.?]/g, ''));
+}
+
+function startRhymeMatch() {
+  startMatchPairs('rhyme', data.rhymePairs, 6,
+    'Tap the words that RHYME! 🎵', '🐦',
+    'Wonderful rhyming! 🎵🌟');
+}
+function startOpposites() {
+  startMatchPairs('opposites', data.oppositePairs, 6,
+    'Tap the OPPOSITES! 🔁', '🐱',
+    'Amazing! You know opposites! 🔁🌟');
+}
+
+/* ============================================================================
+   14) LEVEL 7 — READ WITH THE PRINCESS
+      One sentence at a time, read aloud, words highlight as they are spoken.
+   ========================================================================== */
+function startReading() {
+  const level = LEVELS.find(l => l.id === 'reading');
+  const area = beginLevel(level);
+  const sentences = data.sentences;
+  let index = 0;
+  let highlightTimer = null;
+  let fallbackTimeout = null;
+
+  function clearHighlightTimer() {
+    if (highlightTimer) { clearInterval(highlightTimer); highlightTimer = null; }
+    if (fallbackTimeout) { clearTimeout(fallbackTimeout); fallbackTimeout = null; }
+  }
+  activeCleanup = clearHighlightTimer;
+
+  function showSentence() {
+    area.innerHTML = '';
+    setFeedback('');
+    updateProgressDots(sentences.length, index);
+    clearHighlightTimer();
+
+    const sentence = sentences[index];
+    const words = sentence.split(' ');
+
+    // Character + counter
+    const topRow = document.createElement('div');
+    topRow.className = 'prompt-row';
+    topRow.innerHTML =
+      '<span class="helper-char">👸</span>' +
+      '<div class="prompt-text">Read with the Princess! 📖</div>';
+    area.appendChild(topRow);
+
+    // The sentence, one span per word
+    const line = document.createElement('div');
+    line.className = 'reading-sentence';
+    const wordSpans = [];
+    let charPos = 0;
+    const ranges = [];
+    words.forEach((word, i) => {
+      const span = document.createElement('span');
+      span.className = 'word';
+      span.textContent = word;
+      line.appendChild(span);
+      if (i < words.length - 1) line.appendChild(document.createTextNode(' '));
+      ranges.push({ start: charPos, end: charPos + word.length });
+      charPos += word.length + 1;
+      wordSpans.push(span);
+    });
+    area.appendChild(line);
+
+    function highlightWord(i) {
+      wordSpans.forEach((s, j) => s.classList.toggle('reading', j === i));
+    }
+    function clearHighlights() { wordSpans.forEach(s => s.classList.remove('reading')); }
+
+    // Speak it, highlighting each word. Uses SpeechSynthesis word-boundary
+    // events when the browser fires them; otherwise falls back to a timer.
+    let boundaryWorked = false;
+    const utterance = speak(sentence, {
+      onboundary: (event) => {
+        if (typeof event.charIndex !== 'number') return;
+        boundaryWorked = true;
+        const i = ranges.findIndex(r => event.charIndex >= r.start && event.charIndex < r.end);
+        if (i >= 0) highlightWord(i);
+      },
+      onend: () => { clearHighlightTimer(); clearHighlights(); },
+    });
+
+    // Fallback highlighter for browsers that never fire onboundary
+    fallbackTimeout = setTimeout(() => {
+      if (boundaryWorked || !utterance) return;
+      let i = 0;
+      highlightWord(0);
+      highlightTimer = setInterval(() => {
+        i += 1;
+        if (i >= wordSpans.length) { clearHighlightTimer(); clearHighlights(); return; }
+        highlightWord(i);
+      }, 480);
+    }, 600);
+
+    // Nav row: hear again + next
+    const nav = document.createElement('div');
+    nav.className = 'reading-nav';
+
+    const hearAgain = document.createElement('button');
+    hearAgain.className = 'speak-btn';
+    hearAgain.textContent = '🔊';
+    hearAgain.setAttribute('aria-label', 'Read it again');
+    hearAgain.addEventListener('click', () => {
+      SoundFX.pop();
+      clearHighlightTimer();
+      speak(sentence, { onend: clearHighlights });
+    });
+    nav.appendChild(hearAgain);
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'big-btn btn-pink';
+    nextBtn.textContent = (index === sentences.length - 1) ? '🎉 Finish' : 'Next ➡️';
+    nextBtn.addEventListener('click', () => {
+      SoundFX.pop();
+      addStars(1);           // one star per sentence read
+      index += 1;
+      if (index >= sentences.length) {
+        updateProgressDots(sentences.length, sentences.length);
+        setFeedback('You read all the sentences! 📖🌟', 'good');
+        levelComplete();
+      } else {
+        showSentence();
+      }
+    });
+    nav.appendChild(nextBtn);
+    area.appendChild(nav);
+  }
+
+  showSentence();
+}
+
+/* ============================================================================
+   15) LEVEL 8 — VEGETABLES & FISH  (English + Bangla flashcards, then a quiz)
+   ========================================================================== */
+function startVeggiesFish() {
+  const level = LEVELS.find(l => l.id === 'veggiesFish');
+  const area = beginLevel(level);
+
+  const allCards = data.vegetables.map(c => ({ ...c, category: 'vegetable' }))
+    .concat(data.fish.map(c => ({ ...c, category: 'fish' })));
+  const QUIZ_QUESTIONS = 6;
+  let cardIndex = 0;
+  let quizIndex = 0;
+  let quizDeck = [];
+
+  function showCard() {
+    area.innerHTML = '';
+    setFeedback('');
+    updateProgressDots(allCards.length, cardIndex);
+
+    const card = allCards[cardIndex];
+    const isFish = card.category === 'fish';
+
+    const box = document.createElement('div');
+    box.className = 'flashcard';
+    box.innerHTML =
+      '<span class="flashcard-category' + (isFish ? ' fish' : '') + '">' + (isFish ? '🐟 Fish' : '🥕 Vegetable') + '</span>' +
+      '<div class="flashcard-emoji" role="img" aria-label="' + card.en + '">' + card.emoji + '</div>' +
+      '<div class="flashcard-en">' + card.en + '</div>' +
+      '<div class="flashcard-bn" lang="bn">' + card.bn + '</div>' +
+      '<div class="flashcard-count">Card ' + (cardIndex + 1) + ' of ' + allCards.length + '</div>';
+    area.appendChild(box);
+
+    const nav = document.createElement('div');
+    nav.className = 'reading-nav';
+
+    const hear = document.createElement('button');
+    hear.className = 'speak-btn';
+    hear.textContent = '🔊';
+    hear.setAttribute('aria-label', 'Hear the English word');
+    hear.addEventListener('click', () => { SoundFX.pop(); speak(card.en); });
+    nav.appendChild(hear);
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'big-btn ' + (cardIndex === allCards.length - 1 ? 'btn-yellow' : 'btn-mint');
+    nextBtn.textContent = (cardIndex === allCards.length - 1) ? 'Start Quiz! 🎯' : 'Next ➡️';
+    nextBtn.addEventListener('click', () => {
+      SoundFX.pop();
+      cardIndex += 1;
+      if (cardIndex >= allCards.length) startQuiz();
+      else showCard();
+    });
+    nav.appendChild(nextBtn);
+    area.appendChild(nav);
+
+    speak(card.en);
+  }
+
+  function startQuiz() {
+    quizIndex = 0;
+    quizDeck = pickRandom(allCards, QUIZ_QUESTIONS);
+    updateProgressDots(QUIZ_QUESTIONS, 0);
+    showQuizQuestion();
+  }
+
+  function showQuizQuestion() {
+    area.innerHTML = '';
+    setFeedback('');
+    updateProgressDots(QUIZ_QUESTIONS, quizIndex);
+
+    const answer = quizDeck[quizIndex];
+    const distractors = pickRandom(allCards.filter(c => c.en !== answer.en), 3);
+    const choices = shuffle([answer, ...distractors]);
+
+    const qText = document.createElement('div');
+    qText.className = 'prompt-text';
+    qText.textContent = 'Which one is this? 🤔';
+    area.appendChild(qText);
+
+    // The Bangla word the child must recognise
+    const bn = document.createElement('div');
+    bn.className = 'quiz-bangla';
+    bn.setAttribute('lang', 'bn');
+    bn.textContent = answer.bn;
+    area.appendChild(bn);
+
+    const navRow = document.createElement('div');
+    navRow.className = 'prompt-row';
+    navRow.appendChild(makeSpeakButton(() => answer.en, 'Hear the English word'));
+    navRow.appendChild(Object.assign(document.createElement('span'), { className: 'helper-char', textContent: '👸' }));
+    area.appendChild(navRow);
+
+    const grid = document.createElement('div');
+    grid.className = 'choice-grid';
+    choices.forEach(option => {
+      const btn = makeChoiceButton(
+        '<span class="choice-emoji">' + option.emoji + '</span>',
+        () => {
+          if (option.en === answer.en) {
+            speak(answer.en);
+            handleCorrect(btn, () => {
+              quizIndex += 1;
+              if (quizIndex >= QUIZ_QUESTIONS) { updateProgressDots(QUIZ_QUESTIONS, QUIZ_QUESTIONS); levelComplete(); }
+              else showQuizQuestion();
+            });
+          } else {
+            handleWrong(btn);
+          }
+        }
+      );
+      grid.appendChild(btn);
+    });
+    area.appendChild(grid);
+
+    speak(answer.en);
+  }
+
+  showCard();
+}
+
+/* ============================================================================
+   16) LEVEL 9 — MONTHS SONG
+      Tap the months in order; the Unicorn walks along a rainbow path.
+   ========================================================================== */
+function startMonths() {
+  const level = LEVELS.find(l => l.id === 'months');
+  const area = beginLevel(level);
+
+  // --- Rainbow path (SVG arc) -------------------------------------------
+  const trackWrap = document.createElement('div');
+  trackWrap.className = 'months-track-wrap';
+  trackWrap.innerHTML =
+    '<svg viewBox="0 0 300 110" preserveAspectRatio="none" aria-hidden="true">' +
+      '<defs>' +
+        '<linearGradient id="rainbow-grad" x1="0" y1="0" x2="1" y2="0">' +
+          '<stop offset="0" stop-color="#ff8e8e"/><stop offset=".2" stop-color="#ffc93c"/>' +
+          '<stop offset=".4" stop-color="#9df0c0"/><stop offset=".6" stop-color="#8ed6ff"/>' +
+          '<stop offset=".8" stop-color="#c39bff"/><stop offset="1" stop-color="#ff9ad5"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+      '<path id="rainbow-path" d="M 12 100 Q 150 -34 288 100" fill="none" ' +
+            'stroke="url(#rainbow-grad)" stroke-width="24" stroke-linecap="round" opacity="0.95"/>' +
+    '</svg>' +
+    '<div class="unicorn-walker" id="unicorn-walker">🦄</div>';
+  area.appendChild(trackWrap);
+
+  // --- Instruction row ----------------------------------------------------
+  const questionRow = document.createElement('div');
+  questionRow.className = 'prompt-row';
+  const qText = document.createElement('div');
+  qText.className = 'prompt-text';
+  qText.id = 'months-prompt';
+  qText.textContent = 'Tap the months in order! 🌈';
+  questionRow.appendChild(qText);
+  questionRow.appendChild(makeSpeakButton(() => 'Tap the months in order. Which month comes first? January!', 'Hear the months song'));
+  questionRow.appendChild(Object.assign(document.createElement('span'), { className: 'helper-char', textContent: '🦄' }));
+  area.appendChild(questionRow);
+
+  // --- Month buttons (shuffled) ------------------------------------------
+  const grid = document.createElement('div');
+  grid.className = 'months-grid';
+  area.appendChild(grid);
+
+  let nextIndex = 0; // how many months have been tapped correctly so far
+  updateProgressDots(12, 0);
+
+  shuffle(data.months.map(name => ({ name }))).forEach(({ name }) => {
+    const btn = document.createElement('button');
+    btn.className = 'month-btn';
+    btn.textContent = name;
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('done')) return;
+      if (name === data.months[nextIndex]) {
+        // Correct month, in the right order!
+        btn.classList.add('done');
+        SoundFX.match();
+        speak(name);
+        addStars(1);
+        nextIndex += 1;
+        updateProgressDots(12, nextIndex);
+        moveUnicorn(nextIndex / 12);
+        if (nextIndex >= data.months.length) {
+          $('#months-prompt').textContent = 'You know all the months! 🌈';
+          setFeedback('January to December! 🌈🌟', 'good');
+          speak('You know all the months! January to December!');
+          levelComplete();
+        } else {
+          setFeedback('Yes! ' + name + '! 🌈', 'good');
+        }
+      } else {
+        SoundFX.wrong();
+        setFeedback('Try again! 💪 Which month comes next?', 'oops');
+        shakeElement(btn);
+      }
+    });
+    grid.appendChild(btn);
+    return btn;
+  });
+
+  // --- Unicorn positioning ------------------------------------------------
+  function moveUnicorn(fraction) {
+    const path = trackWrap.querySelector('#rainbow-path');
+    const walker = trackWrap.querySelector('#unicorn-walker');
+    if (!path || !walker) return;
+    const total = path.getTotalLength();
+    const point = path.getPointAtLength(Math.max(0, Math.min(1, fraction)) * total);
+    // Convert viewBox coordinates (300 x 110) into the wrap's pixel size
+    const rect = trackWrap.getBoundingClientRect();
+    walker.style.left = (point.x / 300 * rect.width) + 'px';
+    walker.style.top  = (point.y / 110 * rect.height) + 'px';
+  }
+  // Place the unicorn at the start once layout has happened; keep the
+  // resize handler so the unicorn stays on the arc, and clean it up on exit.
+  requestAnimationFrame(() => moveUnicorn(nextIndex / 12));
+  const onResize = () => moveUnicorn(nextIndex / 12);
+  window.addEventListener('resize', onResize);
+  activeCleanup = () => window.removeEventListener('resize', onResize);
+
+  speak('Tap the months in order. Which month comes first? January!');
+}
+
+/* ============================================================================
+   17) LEVEL 10 — SPELLING & DICTATION
+      Phase 1 "Spelling": hear a word, build it with letter tiles.
+      Phase 2 "Dictation": hear a short sentence, build its key word.
+   ========================================================================== */
+function startSpelling() {
+  const level = LEVELS.find(l => l.id === 'spelling');
+  const area = beginLevel(level);
+
+  const SPELL_COUNT = 7;
+  const DICTATION_COUNT = 5;
+  const spellRounds = pickRandom(data.spellWords, SPELL_COUNT);
+  const dictationRounds = pickRandom(data.dictation, DICTATION_COUNT);
+  const TOTAL = SPELL_COUNT + DICTATION_COUNT;
+
+  let phase = 'spell';
+  let index = 0;   // index within the current phase
+  let answered = 0;
+
+  function showSpellQuestion() {
+    area.innerHTML = '';
+    setFeedback('');
+    updateProgressDots(TOTAL, answered);
+
+    const word = spellRounds[index];
+
+    const pic = document.createElement('div');
+    pic.className = 'big-word-emoji';
+    pic.textContent = emojiForWord(word);
+    area.appendChild(pic);
+
+    const questionRow = document.createElement('div');
+    questionRow.className = 'prompt-row';
+    const qText = document.createElement('div');
+    qText.className = 'prompt-text';
+    qText.textContent = '✏️ Spelling — build the word!';
+    questionRow.appendChild(qText);
+    questionRow.appendChild(makeSpeakButton(() => word, 'Hear the word'));
+    questionRow.appendChild(Object.assign(document.createElement('span'), { className: 'helper-char', textContent: '🦄' }));
+    area.appendChild(questionRow);
+
+    const builderHost = document.createElement('div');
+    builderHost.style.width = '100%';
+    builderHost.style.display = 'flex';
+    builderHost.style.flexDirection = 'column';
+    builderHost.style.alignItems = 'center';
+    builderHost.style.gap = '10px';
+    area.appendChild(builderHost);
+
+    createWordBuilder(builderHost, {
+      target: lettersOnly(word),
+      onComplete: (won, answerRow) => {
+        if (won) {
+          speak(word);
+          handleCorrect(null, advance);
+        } else {
+          SoundFX.wrong();
+          setFeedback('Try again! 💪', 'oops');
+          shakeElement(answerRow);
+        }
+      },
+    });
+
+    speak(word);
+  }
+
+  function showDictationQuestion() {
+    area.innerHTML = '';
+    setFeedback('');
+    updateProgressDots(TOTAL, answered);
+
+    const phrase = dictationRounds[index];
+    // The key word to build = last word of the phrase ("A soap." → SOAP, "An X-ray." → XRAY)
+    const keyWord = phrase.replace(/\.$/, '').split(' ').pop();
+    const target = lettersOnly(keyWord);
+
+    const icon = document.createElement('div');
+    icon.className = 'big-word-emoji';
+    icon.textContent = '👂';
+    area.appendChild(icon);
+
+    const questionRow = document.createElement('div');
+    questionRow.className = 'prompt-row';
+    const qText = document.createElement('div');
+    qText.className = 'prompt-text';
+    qText.textContent = '👂 Listen! Build the word!';
+    questionRow.appendChild(qText);
+    questionRow.appendChild(makeSpeakButton(() => phrase, 'Hear the sentence'));
+    questionRow.appendChild(Object.assign(document.createElement('span'), { className: 'helper-char', textContent: '👸' }));
+    area.appendChild(questionRow);
+
+    const builderHost = document.createElement('div');
+    builderHost.style.width = '100%';
+    builderHost.style.display = 'flex';
+    builderHost.style.flexDirection = 'column';
+    builderHost.style.alignItems = 'center';
+    builderHost.style.gap = '10px';
+    area.appendChild(builderHost);
+
+    createWordBuilder(builderHost, {
+      target,
+      onComplete: (won, answerRow) => {
+        if (won) {
+          speak(phrase); // read the whole sentence back proudly
+          handleCorrect(null, advance);
+        } else {
+          SoundFX.wrong();
+          setFeedback('Try again! 💪 Listen again!', 'oops');
+          shakeElement(answerRow);
+        }
+      },
+    });
+
+    speak(phrase);
+  }
+
+  function advance() {
+    answered += 1;
+    index += 1;
+    if (phase === 'spell' && index >= SPELL_COUNT) {
+      // Switch to dictation phase
+      phase = 'dictation';
+      index = 0;
+      setFeedback('Now listen and build! 👂', 'good');
+      setTimeout(showDictationQuestion, 900);
+      return;
+    }
+    if (phase === 'dictation' && index >= DICTATION_COUNT) {
+      updateProgressDots(TOTAL, TOTAL);
+      levelComplete();
+      return;
+    }
+    if (phase === 'spell') showSpellQuestion(); else showDictationQuestion();
+  }
+
+  showSpellQuestion();
+}
+
+/* ============================================================================
+   18) LEVEL ROUTER + BOOT
+   ========================================================================== */
+const LEVEL_STARTERS = {
+  letterFriends: startLetterFriends,
+  findWord:      startFindWord,
+  jumbled:       startJumbled,
+  vowelTime:     startVowelTime,
+  rhyme:         startRhymeMatch,
+  opposites:     startOpposites,
+  reading:       startReading,
+  veggiesFish:   startVeggiesFish,
+  months:        startMonths,
+  spelling:      startSpelling,
+};
+
+/** Start a level from anywhere (home grid, play-again button). */
+function startLevelById(id) {
+  const starter = LEVEL_STARTERS[id];
+  if (!starter) { console.error('Unknown level:', id); return; }
+  SoundFX.pop();
+  starter();
+}
+
+function buildHomeGrid() {
+  const grid = $('#level-grid');
+  grid.innerHTML = '';
+  LEVELS.forEach(level => {
+    const btn = document.createElement('button');
+    btn.className = 'level-btn ' + level.cssClass;
+    btn.setAttribute('aria-label', 'Play ' + level.name);
+    btn.innerHTML = '<span class="lvl-emoji">' + level.icon + '</span><span>' + level.name + '</span>';
+    btn.addEventListener('click', () => startLevelById(level.id));
+    grid.appendChild(btn);
+  });
+}
+
+function init() {
+  loadSavedState();
+  updateStarDisplay();
+  buildHomeGrid();
+
+  // Top bar buttons
+  $('#home-btn').addEventListener('click', () => { SoundFX.pop(); goHome(); });
+  $('#mute-btn').addEventListener('click', () => {
+    muted = !muted;
+    saveMute();
+    $('#mute-btn').textContent = muted ? '🔇' : '🔊';
+    if (!muted) { SoundFX.pop(); speak('Sound is on!'); }
+  });
+  $('#mute-btn').textContent = muted ? '🔇' : '🔊';
+
+  // Celebration screen buttons
+  $('#play-again-btn').addEventListener('click', () => {
+    if (currentLevel) startLevelById(currentLevel.id);
+  });
+  $('#celebrate-home-btn').addEventListener('click', () => { SoundFX.pop(); goHome(); });
+
+  showScreen('home');
+}
+
+// Little pop animation for the star pill (added here so CSS stays tiny)
+const popStyle = document.createElement('style');
+popStyle.textContent = '.pop{animation:star-pop .45s ease;}@keyframes star-pop{0%{transform:scale(1)}40%{transform:scale(1.45) rotate(-6deg)}100%{transform:scale(1)}}';
+document.head.appendChild(popStyle);
+
+init();
+
+</script>
+</body>
+</html>
